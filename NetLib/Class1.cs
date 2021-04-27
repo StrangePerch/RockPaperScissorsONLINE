@@ -16,45 +16,44 @@ namespace NetLib
         public Client(TcpClient client, string username) => (TcpClient, Username) = (client, username);
     }
 
-    public enum Commands { Ping, UserData, Ok, Host, Error, RequestGames, Games, Move,
+    public enum Commands { UserData, Ok, Host, Error, RequestGames, Games, Move,
         Connect, GameInfo, PlayerInfo, Close}
 
     public enum Errors { NameIsTaken }
     
     public enum Move { Rock, Paper, Scissors }
     
+    public interface IBasePacket { }
+
     [Serializable]
-    public record BasePacket
+    public record CommandPacket : IBasePacket
     {
-        public Commands Command { get; set; }
-
-        public BasePacket(Commands command) => Command = command;
-
-        public BasePacket() { }
+        public Commands Command;
+        public CommandPacket(Commands command) => Command = command;
     }
+    
+    [Serializable]
+    public record PingPacket : IBasePacket { }
 
     [Serializable]
-    public record ConnectPacket : BasePacket
+    public record ConnectPacket : IBasePacket
     {
         public string GameName { get; set; }
 
-        public ConnectPacket(string gameName) : base(Commands.Connect) => GameName = gameName;
-
+        public ConnectPacket(string gameName) => GameName = gameName;
         public ConnectPacket() { }
     }
 
     [Serializable]
-    public record ErrorPacket : BasePacket
+    public record ErrorPacket : IBasePacket
     {
         public Errors Error { get; set; }
-
-        public ErrorPacket(Errors error) : base(Commands.Error) => Error = error;
-
+        public ErrorPacket(Errors error) => Error = error;
         public ErrorPacket() { }
     }
 
     [Serializable]
-    public record MovePacket : BasePacket
+    public record MovePacket : IBasePacket
     {
         public Move Move { get; set; }
         
@@ -62,62 +61,62 @@ namespace NetLib
 
         public bool Host { get; set; }
 
-        public MovePacket(Move move, string gameName, bool host) : base(Commands.Move) => (Move, GameName, Host) = (move, gameName, host);
+        public MovePacket(Move move, string gameName, bool host) => (Move, GameName, Host) = (move, gameName, host);
 
         public MovePacket() { }
     }
 
     [Serializable]
-    public record UserDataPacket : BasePacket
+    public record UserDataPacket : IBasePacket
     {
         public string Username { get; set; }
 
-        public UserDataPacket(string username) : base(Commands.UserData) => Username = username;
+        public UserDataPacket(string username) => Username = username;
         
         public UserDataPacket() { }
     }
 
     [Serializable]
-    public record HostGamePacket : BasePacket
+    public record HostGamePacket : IBasePacket
     {
         public string Name { get; set; }
         public int MaxScore { get; set; }
 
-        public HostGamePacket(string name, int score) : base(Commands.Host) => (Name, MaxScore) = (name, score);
+        public HostGamePacket(string name, int score) => (Name, MaxScore) = (name, score);
 
         public HostGamePacket() { }
     }
 
     [Serializable]
-    public record CloseGamePacket : BasePacket
+    public record CloseGamePacket : IBasePacket
     {
         public string Name { get; set; }
 
-        public CloseGamePacket(string name) : base(Commands.Close) => Name = name;
+        public CloseGamePacket(string name) => Name = name;
 
         public CloseGamePacket() { }
     }
 
     [Serializable]
-    public record GamesPacket : BasePacket
+    public record GamesPacket : IBasePacket
     {
         public List<GamePacket> Games { get; set; }
 
-        public GamesPacket() : base(Commands.Games)
+        public GamesPacket()
         {
             Games = new List<GamePacket>();
         }
     }
     
     [Serializable]
-    public record GamePacket : BasePacket
+    public record GamePacket : IBasePacket
     {
         public string Name { get; set; }
         public string Host { get; set; }
         public int MaxScore { get; set; }
 
 
-        public GamePacket(string name, string host, int score) : base(Commands.GameInfo)
+        public GamePacket(string name, string host, int score)
         {
             Name = name;
             Host = host;
@@ -126,11 +125,11 @@ namespace NetLib
     }
 
     [Serializable]
-    public record PlayerPacket : BasePacket
+    public record PlayerPacket : IBasePacket
     {
         public string Name { get; set; }
 
-        public PlayerPacket(string name) : base(Commands.PlayerInfo)
+        public PlayerPacket(string name)
         {
             Name = name;
         }
@@ -138,8 +137,8 @@ namespace NetLib
 
     public static class Protocol
     {
-        public static BinaryFormatter Formatter = new ();
-        public static void SendTcp(TcpClient client, BasePacket data)
+        private static readonly BinaryFormatter Formatter = new ();
+        public static void SendTcp(TcpClient client, IBasePacket data)
         {
             var stream = client.GetStream();
             stream.Flush();
@@ -148,13 +147,13 @@ namespace NetLib
             Formatter.Serialize(stream,data);
         }
         
-        public static BasePacket ReceiveTcp(TcpClient client)
+        public static IBasePacket ReceiveTcp(TcpClient client)
         {
             client.ReceiveTimeout = -1;
             var stream = client.GetStream();
             //XmlSerializer serializer = new XmlSerializer(typeof(BasePacket));
             //return (BasePacket)serializer.Deserialize(stream);
-            return (BasePacket)Formatter.Deserialize(stream);
+            return (IBasePacket)Formatter.Deserialize(stream);
         }
 
         public static async void Ping(Client client, ICollection<Client> collection)
@@ -163,7 +162,7 @@ namespace NetLib
             {
                 try
                 {
-                    SendTcp(client.TcpClient, new BasePacket(Commands.Ping));
+                    SendTcp(client.TcpClient, new PingPacket());
                     client.TcpClient.ReceiveTimeout = 3000;
                     return;
                 }

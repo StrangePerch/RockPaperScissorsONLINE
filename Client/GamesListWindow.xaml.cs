@@ -27,7 +27,7 @@ namespace Client
 
         private void RefreshButton_OnClick(object sender, RoutedEventArgs e)
         {
-            GamePanel.ItemsSource = ((GamesPacket)ConnectionManager.SendWithResult(new BasePacket(Commands.RequestGames))).Games;
+            GamePanel.ItemsSource = ((GamesPacket)ConnectionManager.SendWithResult(new GamesPacket())).Games;
         }
 
         private void HostButton_OnClick(object sender, RoutedEventArgs e)

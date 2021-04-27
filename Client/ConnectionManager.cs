@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,7 +22,7 @@ namespace Client
             {
                 try
                 {
-                    Server.Connect(IPAddress.Parse("212.92.229.142"), 57650);
+                    Server.Connect(IPAddress.Parse("127.0.0.1"), 57650);
                     break;
                 }
                 catch
@@ -32,16 +33,16 @@ namespace Client
         }
         
         
-        public static BasePacket SendWithResult(BasePacket data)
+        public static IBasePacket SendWithResult(IBasePacket data)
         {
             Protocol.SendTcp(Server, data);
             while (true)
             {
                 var result = Protocol.ReceiveTcp(Server);
 
-                if (result.Command == Commands.Ping)
+                if (result is PingPacket)
                 {
-                    Protocol.SendTcp(Server, new BasePacket(Commands.Ping));
+                    Protocol.SendTcp(Server, new PingPacket());
                     continue;
                 }
                 
@@ -49,14 +50,14 @@ namespace Client
             }
         }
 
-        public static BasePacket Receive()
+        public static IBasePacket Receive()
         {
             while (true)
             {
                 var command = Protocol.ReceiveTcp(Server);
-                if (command.Command == Commands.Ping)
+                if (command is PingPacket)
                 {
-                    Protocol.SendTcp(Server, new BasePacket(Commands.Ping));
+                    Protocol.SendTcp(Server, new PingPacket());
                     continue;
                 }
 
@@ -64,28 +65,29 @@ namespace Client
             }
         }
 
-        public static void Send(BasePacket data)
+        public static void Send(IBasePacket data)
         {
             Protocol.SendTcp(Server, data);
         }
         
-        public static void SendWithErrorAnswer(BasePacket data)
+        public static void SendWithErrorAnswer(IBasePacket data)
         {
             Protocol.SendTcp(Server, data);
             while (true)
             {
-                var command = Protocol.ReceiveTcp(Server);
-                if (command.Command == Commands.Ok) return;
-                if (command.Command == Commands.Error)
-                    if (((ErrorPacket) command).Error == Errors.NameIsTaken)
-                        throw new Exception(((ErrorPacket) command).Error.ToString());
-
-                if (command.Command == Commands.Ping)
+                var packet = Protocol.ReceiveTcp(Server);
+                switch (packet)
                 {
-                    Protocol.SendTcp(Server, new BasePacket(Commands.Ping));
-                    continue;
+                    case PingPacket:
+                        Protocol.SendTcp(Server, new PingPacket());
+                        continue;
+                    case ErrorPacket error:
+                        throw new Exception(error.Error.ToString());
+                        break;
                 }
-                
+
+                if(((CommandPacket) packet).Command == Commands.Ok) return;
+
                 throw new Exception("Unexpected command received");
             }
         }
