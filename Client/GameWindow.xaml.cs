@@ -21,119 +21,137 @@ namespace Client
     /// </summary>
     public partial class GameWindow : Window
     {
-        private static BitmapImage Scissors = new(new Uri("scissors.png", UriKind.Relative));
-        private static BitmapImage Paper = new(new Uri("paper.png", UriKind.Relative));
-        private static BitmapImage Rock = new(new Uri("rock.png", UriKind.Relative));
+        private static readonly BitmapImage Scissors = new(new Uri("scissors.png", UriKind.Relative));
+        private static readonly BitmapImage Paper = new(new Uri("paper.png", UriKind.Relative));
+        private static readonly BitmapImage Rock = new(new Uri("rock.png", UriKind.Relative));
 
 
-        private int youScore = 0;
+        private int _youScore = 0;
+
         private int YouScore
         {
-            get => youScore;
+            get => _youScore;
             set
             {
                 Dispatcher.Invoke(() =>
                 {
-                    if (value > youScore)
+                    if (value > _youScore)
                     {
-                        winner = 1;
+                        _winner = 1;
                     }
-                    youScore = value;
-                    ScoreBlock.Text = $"You: {YouScore}, Enemy: {EnemyScore}, Max: {MaxScore}";
+
+                    _youScore = value;
+                    ScoreBlock.Text = $"You: {YouScore}, Enemy: {EnemyScore}, Max: {_maxScore}";
                 });
             }
         }
-        private int enemyScore = 0;
+
+        private int _enemyScore = 0;
+
         private int EnemyScore
         {
-            get => enemyScore;
+            get => _enemyScore;
             set
             {
                 Dispatcher.Invoke(() =>
                 {
-                    if (value > enemyScore)
+                    if (value > _enemyScore)
                     {
-                        winner = 2;
+                        _winner = 2;
                     }
-                    enemyScore = value;
-                    ScoreBlock.Text = $"You: {YouScore}, Enemy: {EnemyScore}, Max: {MaxScore}";
+
+                    _enemyScore = value;
+                    ScoreBlock.Text = $"You: {YouScore}, Enemy: {EnemyScore}, Max: {_maxScore}";
                 });
             }
         }
 
-        private int MaxScore;
-        private string EnemyName;
-        private string YouName;
+        private readonly int _maxScore;
+        private string _enemyName;
+        private string _youName;
 
-        private bool Host;
+        private readonly bool _host;
 
-        private bool YouMoved = false;
-        private bool EnemyMoved = false;
+        private bool _youMoved = false;
+        private bool _enemyMoved = false;
 
-        private Move YouMoveBuffer;
-        private Move EnemyMoveBuffer;
+        private Move _youMoveBuffer;
+        private Move _enemyMoveBuffer;
         private string GameName { get; init; }
 
-        private int winner;
+        private int _winner;
+
         public GameWindow(bool host, string name, string secondPlayer, int maxScore)
         {
             InitializeComponent();
 
             GameName = name;
-            Host = host;
-            EnemyName = secondPlayer;
-            MaxScore = maxScore;
+            _host = host;
+            _enemyName = secondPlayer;
+            _maxScore = maxScore;
         }
 
         private async void Play()
         {
             await Task.Run(() =>
             {
-                while (YouScore < MaxScore && EnemyScore < MaxScore)
+                while (YouScore < _maxScore && EnemyScore < _maxScore)
                 {
                     Dispatcher.Invoke(() =>
                         {
-                            EnemyReadyBlock.Text = $"{EnemyName}: thinking...";
-                            YouReadyBlock.Text = $"{YouName}: thinking...";
-                            EnemyMove.Text = String.Empty;
+                            EnemyReadyBlock.Text = $"{_enemyName}: thinking...";
+                            YouReadyBlock.Text = $"{_youName}: thinking...";
+                            EnemyMove.Text = string.Empty;
                             EnemyImage.Source = null;
                             YouImage.Source = null;
                         }
                     );
-                    
+
                     EnableButtons();
 
-                    if (ConnectionManager.Receive() is MovePacket move)
+                    var basePacket = ConnectionManager.Receive();
+                    if (basePacket is MovePacket move)
                     {
-                        EnemyMoveBuffer = move.Move;
-                        EnemyMoved = true;
-                        
-                        Move(EnemyMoveBuffer, false);
+                        _enemyMoveBuffer = move.Move;
+                        _enemyMoved = true;
+
+                        Move(_enemyMoveBuffer, false);
+                    }
+                    else if (basePacket is Surrender)
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            EnemyReadyBlock.Text = $"{_enemyName}: SURRENDERED!!!";
+                            YouReadyBlock.Text = $"{ConnectionManager.ClientName}: WON THE GAME!!!";
+                        });
+
+                        if (_host) ConnectionManager.Send(new CloseGamePacket(GameName));
+                        return;
                     }
                     else
                     {
                         throw new Exception("Not expected packet type");
                     }
 
-                    while (!YouMoved)
+                    while (!_youMoved)
                     {
                     }
 
-                    winner = 0;
-                    
-                    switch (YouMoveBuffer)
+                    _winner = 0;
+
+                    switch (_youMoveBuffer)
                     {
                         case NetLib.Move.Rock:
-                            if (EnemyMoveBuffer == NetLib.Move.Paper) EnemyScore++;
-                            else if (EnemyMoveBuffer == NetLib.Move.Scissors) YouScore++;
+                            if (_enemyMoveBuffer == NetLib.Move.Paper) EnemyScore++;
+                            else if (_enemyMoveBuffer == NetLib.Move.Scissors) YouScore++;
                             break;
                         case NetLib.Move.Paper:
-                            if (EnemyMoveBuffer == NetLib.Move.Rock) YouScore++;
-                            else if (EnemyMoveBuffer == NetLib.Move.Scissors) EnemyScore++;
+                            if (_enemyMoveBuffer == NetLib.Move.Rock) YouScore++;
+                            else if (_enemyMoveBuffer == NetLib.Move.Scissors) EnemyScore++;
                             break;
                         case NetLib.Move.Scissors:
-                            if (EnemyMoveBuffer == NetLib.Move.Paper) YouScore++;
-                            else if (EnemyMoveBuffer == NetLib.Move.Rock) EnemyScore++;
+                            if (_enemyMoveBuffer == NetLib.Move.Paper) YouScore++;
+                            else if (_enemyMoveBuffer == NetLib.Move.Rock) EnemyScore++;
                             break;
                         default:
                             throw new ArgumentOutOfRangeException();
@@ -141,28 +159,28 @@ namespace Client
 
                     Dispatcher.Invoke(() =>
                     {
-                        if (winner == 0)
+                        if (_winner == 0)
                         {
-                            EnemyReadyBlock.Text = $"{EnemyName}: Draw";
+                            EnemyReadyBlock.Text = $"{_enemyName}: Draw";
                             YouReadyBlock.Text = $"{ConnectionManager.ClientName}: Draw";
                         }
-                        else if (winner == 1)
+                        else if (_winner == 1)
                         {
-                            EnemyReadyBlock.Text = $"{EnemyName}: lost round";
+                            EnemyReadyBlock.Text = $"{_enemyName}: lost round";
                             YouReadyBlock.Text = $"{ConnectionManager.ClientName}: won the round";
                         }
-                        else if (winner == 2)
+                        else if (_winner == 2)
                         {
-                            EnemyReadyBlock.Text = $"{EnemyName}: won the round";
+                            EnemyReadyBlock.Text = $"{_enemyName}: won the round";
                             YouReadyBlock.Text = $"{ConnectionManager.ClientName}: lost round";
                         }
                     });
-                    
+
 
                     Thread.Sleep(3000);
 
-                    YouMoved = false;
-                    EnemyMoved = false;
+                    _youMoved = false;
+                    _enemyMoved = false;
                 }
 
 
@@ -170,20 +188,20 @@ namespace Client
                 {
                     if (YouScore > EnemyScore)
                     {
-                        EnemyReadyBlock.Text = $"{EnemyName}: LOST THE GAME!!!";
+                        EnemyReadyBlock.Text = $"{_enemyName}: LOST THE GAME!!!";
                         YouReadyBlock.Text = $"{ConnectionManager.ClientName}: WON THE GAME!!!";
                     }
                     else
                     {
-                        EnemyReadyBlock.Text = $"{EnemyName}: WON THE GAME!!!";
+                        EnemyReadyBlock.Text = $"{_enemyName}: WON THE GAME!!!";
                         YouReadyBlock.Text = $"{ConnectionManager.ClientName}: LOST THE GAME!!!";
                     }
-                    
+
                 });
-                
-                if(Host) ConnectionManager.Send(new CloseGamePacket(GameName));
+
+                if (_host) ConnectionManager.Send(new CloseGamePacket(GameName));
             });
-                        
+
         }
 
         private void RockButton_OnClick(object sender, RoutedEventArgs e)
@@ -200,28 +218,25 @@ namespace Client
         {
             Move(NetLib.Move.Scissors);
         }
-        
+
         private void Move(Move move, bool you = true)
         {
             if (you)
             {
                 Dispatcher.Invoke(() =>
                 {
-                    YouReadyBlock.Text = $"{YouName}: Ready";
-                    YouMoveBuffer = move;
+                    YouReadyBlock.Text = $"{_youName}: Ready";
+                    _youMoveBuffer = move;
                 });
 
-                ConnectionManager.Send(new MovePacket(move, GameName, Host));
+                ConnectionManager.Send(new MovePacket(move, GameName, _host));
             }
             else
             {
-                Dispatcher.Invoke(() =>
-                {
-                    EnemyReadyBlock.Text = $"{EnemyName}: Ready";
-                });
+                Dispatcher.Invoke(() => { EnemyReadyBlock.Text = $"{_enemyName}: Ready"; });
             }
-            
-            if(!you && !YouMoved) return;
+
+            if (!you && !_youMoved) return;
 
             Dispatcher.Invoke(() =>
             {
@@ -234,6 +249,7 @@ namespace Client
                             EnemyImage.Source = Rock;
                             EnemyMove.Text = "Rock";
                         }
+
                         break;
                     case NetLib.Move.Paper:
                         if (you) YouImage.Source = Paper;
@@ -242,6 +258,7 @@ namespace Client
                             EnemyImage.Source = Paper;
                             EnemyMove.Text = "Paper";
                         }
+
                         break;
                     case NetLib.Move.Scissors:
                         if (you) YouImage.Source = Scissors;
@@ -250,6 +267,7 @@ namespace Client
                             EnemyImage.Source = Scissors;
                             EnemyMove.Text = "Scissors";
                         }
+
                         break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(move), move, null);
@@ -259,17 +277,17 @@ namespace Client
 
             if (you)
             {
-                YouMoved = true;
+                _youMoved = true;
 
-                
-                if(EnemyMoved)
-                    Move(EnemyMoveBuffer, false);
-                
+
+                if (_enemyMoved)
+                    Move(_enemyMoveBuffer, false);
+
                 DisableButtons();
             }
             else
             {
-                EnemyMoved = true;
+                _enemyMoved = true;
             }
         }
 
@@ -291,24 +309,30 @@ namespace Client
                 PaperButton.IsEnabled = true;
                 ScissorsButton.IsEnabled = true;
             });
-            
+
         }
 
         private void GameWindow_OnLoaded(object sender, RoutedEventArgs e)
         {
             DisableButtons();
 
-            YouName = ConnectionManager.ClientName;
+            _youName = ConnectionManager.ClientName;
 
-            if (Host)
+            if (_host)
             {
                 if (ConnectionManager.Receive() is PlayerPacket player)
                 {
-                    EnemyName = player.Name;
+                    _enemyName = player.Name;
                 }
             }
 
             Play();
+        }
+
+        private void GameWindow_OnClosed(object? sender, EventArgs e)
+        {
+            ConnectionManager.Send(new Surrender());
+            if (_host) ConnectionManager.Send(new CloseGamePacket(GameName));
         }
     }
 }

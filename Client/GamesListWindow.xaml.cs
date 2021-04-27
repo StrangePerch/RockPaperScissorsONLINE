@@ -24,7 +24,6 @@ namespace Client
         {
             InitializeComponent();
         }
-
         private void RefreshButton_OnClick(object sender, RoutedEventArgs e)
         {
             GamePanel.ItemsSource = ((GamesPacket)ConnectionManager.SendWithResult(new GamesPacket())).Games;

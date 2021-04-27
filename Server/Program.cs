@@ -10,7 +10,7 @@ using NetLib;
 
 namespace Server
 {
-    internal static class Program
+    static class Program
     {
         private static readonly List<Client> ConnectedClients = new ();
 
@@ -34,10 +34,35 @@ namespace Server
         {
             foreach (var client in ConnectedClients)
             {
-                Protocol.Ping(client, ConnectedClients);
+                Protocol.Ping(client, ClientDisconnected);
             }
         }
-        
+
+        static void ClientDisconnected(Client client)
+        {
+            ClientSurrender(client);
+            ConnectedClients.Remove(client);
+            Console.WriteLine($"{client.Username} Disconnected!");
+        }
+
+        static void ClientSurrender(Client client)
+        {
+            foreach (var keyValuePair in Games)
+            {
+                var valueHost = keyValuePair.Value.Host;
+                var valueClient = keyValuePair.Value.Client;
+
+                if(valueHost == null || valueClient == null) continue;
+                if (valueHost == client)
+                {
+                    Protocol.SendTcp(valueClient.TcpClient, new Surrender());
+                }
+                else if (valueClient == client)
+                {
+                    Protocol.SendTcp(valueHost.TcpClient, new Surrender());
+                }
+            }
+        }
         static async Task AcceptCommands(Client client)
         {
             await Task.Run(() =>
@@ -66,7 +91,7 @@ namespace Server
                             if (!usernameIsTaken)
                             {
                                 client.Username = data?.Username;
-                                Protocol.SendTcp(client.TcpClient, new CommandPacket(Commands.Ok));
+                                Protocol.SendTcp(client.TcpClient, new Ok());
                                 Console.WriteLine($"{client.Username} connected!");
                             }
                             else
@@ -90,7 +115,7 @@ namespace Server
                             if (!usernameIsTaken)
                             {
                                 Games.Add(hostData?.Name, new Game(hostData?.Name, client, hostData.MaxScore));
-                                Protocol.SendTcp(client.TcpClient, new CommandPacket(Commands.Ok));
+                                Protocol.SendTcp(client.TcpClient, new Ok());
                                 Console.WriteLine($"{client.Username} hosted game {hostData?.Name}!");
                             }
                             else
@@ -104,7 +129,8 @@ namespace Server
                         case GamesPacket packet:
                             foreach (var game in Games)
                             {
-                                packet.Games.Add(game.Value.ToGamePacket());
+                                if(game.Value.Client == null)
+                                    packet.Games.Add(game.Value.ToGamePacket());
                             }
                             Protocol.SendTcp(client.TcpClient, packet);
                             break;
@@ -122,6 +148,9 @@ namespace Server
                                     break;
                             }
 
+                            break;
+                        case Surrender:
+                            ClientSurrender(client);
                             break;
                         case ConnectPacket connect:
                             if (connect == null) break;

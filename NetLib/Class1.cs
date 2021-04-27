@@ -16,9 +16,6 @@ namespace NetLib
         public Client(TcpClient client, string username) => (TcpClient, Username) = (client, username);
     }
 
-    public enum Commands { UserData, Ok, Host, Error, RequestGames, Games, Move,
-        Connect, GameInfo, PlayerInfo, Close}
-
     public enum Errors { NameIsTaken }
     
     public enum Move { Rock, Paper, Scissors }
@@ -26,11 +23,10 @@ namespace NetLib
     public interface IBasePacket { }
 
     [Serializable]
-    public record CommandPacket : IBasePacket
-    {
-        public Commands Command;
-        public CommandPacket(Commands command) => Command = command;
-    }
+    public record Ok : IBasePacket { }
+    
+    [Serializable]
+    public record Surrender : IBasePacket { }
     
     [Serializable]
     public record PingPacket : IBasePacket { }
@@ -156,7 +152,7 @@ namespace NetLib
             return (IBasePacket)Formatter.Deserialize(stream);
         }
 
-        public static async void Ping(Client client, ICollection<Client> collection)
+        public static async void Ping(Client client, Action<Client> handler)
         {
             await Task.Run(() =>
             {
@@ -170,9 +166,8 @@ namespace NetLib
                 {
                     // ignored
                 }
-
-                collection.Remove(client);
-                Console.WriteLine($"{client.Username} Disconnected!");
+                
+                handler(client);
             });
         }
     }

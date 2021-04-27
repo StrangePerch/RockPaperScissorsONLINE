@@ -86,7 +86,7 @@ namespace Client
                         break;
                 }
 
-                if(((CommandPacket) packet).Command == Commands.Ok) return;
+                if(packet is Ok) return;
 
                 throw new Exception("Unexpected command received");
             }
