@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net5.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="paper.png" />
+    <None Remove="rock.png" />
+    <None Remove="scissors.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="paper.png" />
+    <Resource Include="rock.png" />
+    <Resource Include="scissors.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NetLib\NetLib.csproj" />
+  </ItemGroup>
+
+</Project>
